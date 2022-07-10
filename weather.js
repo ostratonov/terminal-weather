@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+'use strict'
+
+require('dotenv').config()
 const axios = require('axios')
 const chalk = require('chalk')
 
@@ -12,20 +15,42 @@ const WEATHER_KEYS_NORMALIZED = ['temperature (c)', 'wind speed (kph)', 'feels l
 const transform = (response) => {
   const weatherInfo = response.data.current
 
-  const result = {}
+  const weather = {}
+  const airCondition = {}
 
   WEATHER_KEYS.forEach( (key, idx) => {
-    result[WEATHER_KEYS_NORMALIZED[idx]] = weatherInfo[key]
+    weather[WEATHER_KEYS_NORMALIZED[idx]] = weatherInfo[key]
   })
 
-  return result
+  airCondition.airQuality = weatherInfo.air_quality['us-epa-index']
+
+  return {
+    weather,
+    airCondition,
+  }
 }
 
-const print = (weather) => {
+const getUsIpaIndexColor = airQuality => {
+  const qualityMap = {
+    'green' : [1,2],
+    'yellow' : [3,4],
+    'red' : [5,6],
+  }
+
+  const qualityIndex = Object.values(qualityMap).findIndex(level => level.includes(airQuality))
+
+  return Object.keys(qualityMap)[qualityIndex] || 'grey'
+}
+
+const print = (result) => {
   console.log(chalk.magentaBright('weather for now in kyiv: '))
 
-  for ( const [attr, value] of Object.entries(weather)){
+  for ( const [attr, value] of Object.entries(result.weather)){
     console.log(chalk.magenta([attr, value].join(' : ')))
+  }
+
+  for ( const [attr, value] of Object.entries(result.airCondition)){
+    console.log(chalk[getUsIpaIndexColor(value)]([attr, value].join(' : ')))
   }
 }
 
@@ -34,13 +59,13 @@ const print = (weather) => {
     params : {
       q : 'Kiev',
       key : API_KEY,
-      aqicurrent : 'yes'
+      aqi : 'yes',
     }
   })
   .then(transform)
   .then(print)
-  .catch(() => { 
-    console.error('Oops, something went wrong...')
+  .catch((e) => { 
+    console.error('Oops, something went wrong...', e.toString())
     process.exit(1)
   })
 })()
